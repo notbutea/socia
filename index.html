@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, height=720, initial-scale=1.0">
+  <title>서희의 외교 담판 - 소손녕을 설득하라!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background-color: #111;
+      color: #fff;
+      font-family: 'Malgun Gothic', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 16:9 비율 유지 게임 화면 */
+    #game-container {
+      width: 1280px;
+      height: 720px;
+      background: #000;
+      position: relative;
+      border: 4px solid #444;
+      box-shadow: 0 0 30px rgba(0,0,0,0.8);
+      overflow: hidden;
+    }
+
+    /* 비디오 및 이미지 레이어 */
+    .media-layer {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* API 입력 및 설정 모달 */
+    #api-modal {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      text-align: center;
+    }
+
+    #api-modal h2 { color: #f39c12; margin-bottom: 20px; font-size: 28px; }
+    #api-modal p { line-height: 1.6; margin-bottom: 15px; color: #ccc; }
+    #api-modal a { color: #3498db; text-decoration: underline; }
+    #api-input {
+      width: 500px; padding: 12px; font-size: 16px; border-radius: 5px;
+      border: 1px solid #555; margin-bottom: 20px; text-align: center;
+      user-select: auto;
+    }
+    .btn {
+      padding: 12px 30px; font-size: 18px; font-weight: bold; background: #e67e22;
+      color: white; border: none; border-radius: 5px; cursor: pointer; transition: 0.2s;
+    }
+    .btn:hover { background: #d35400; }
+
+    /* 대화창 UI */
+    #ui-layer {
+      position: absolute; bottom: 0; left: 0; width: 100%; height: 280px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.95) 30%);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 20px 40px; z-index: 10;
+    }
+
+    #speaker-name { font-size: 22px; font-weight: bold; color: #f1c40f; margin-bottom: 8px; }
+    #dialogue-text { font-size: 18px; line-height: 1.5; height: 75px; color: #ecf0f1; overflow-y: auto; }
+
+    /* 점수 게이지 바 */
+    #score-board {
+      position: absolute; top: 20px; right: 20px; width: 300px;
+      background: rgba(0,0,0,0.7); border: 2px solid #555; padding: 15px;
+      border-radius: 10px; z-index: 10;
+    }
+    #score-bar-bg { width: 100%; height: 20px; background: #333; border-radius: 10px; overflow: hidden; margin-top: 5px;}
+    #score-bar { width: 0%; height: 100%; background: #2ecc71; transition: width 0.5s; }
+
+    /* 컨트롤 영역 (키보드 + 마이크) */
+    #control-box {
+      margin-top: 10px; display: flex; gap: 10px; align-items: center;
+    }
+
+    #text-input {
+      flex: 1; padding: 12px 15px; font-size: 16px; border-radius: 8px;
+      border: 1px solid #555; background: rgba(0, 0, 0, 0.7); color: #fff;
+      outline: none; user-select: auto;
+    }
+
+    #text-input:focus { border-color: #f39c12; }
+
+    #send-btn {
+      background: #2980b9; color: white; border: none; padding: 12px 20px;
+      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer;
+    }
+    #send-btn:hover { background: #3498db; }
+
+    #mic-btn {
+      background: #c0392b; color: white; border: none; padding: 12px 18px;
+      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
+    }
+    #mic-btn.recording { background: #27ae60; animation: pulse 1s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+    /* 엔딩 스크린 */
+    #ending-screen {
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      background: #000; z-index: 50; display: none; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+    }
+    #ending-title { font-size: 48px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+<div id="game-container">
+  <!-- 비디오 배경 -->
+  <video id="sosonnyung-video" class="media-layer" loop muted autoplay>
+    <source src="sosonnyung.webm" type="video/webm">
+    비디오를 지원하지 않는 브라우저입니다.
+  </video>
+  <video id="ending-video" class="media-layer" style="display: none;" muted></video>
+
+  <!-- API 설정 모달 -->
+  <div id="api-modal">
+    <h2>소손녕을 설득하라! - API 설정</h2>
+    <p>본 게임은 구글 Gemini AI를 활용합니다.<br>
+    발급받은 무료 API Key를 입력 후 게임을 시작하세요.<br>
+    <a href="https://aistudio.google.com/app/apikey" target="_blank">[Google AI Studio 무료 키 발급받기]</a></p>
+    <input type="password" id="api-input" placeholder="AI Studio API Key를 입력하세요">
+    <button class="btn" onclick="startGame()">담판 시작하기</button>
+  </div>
+
+  <!-- 점수 표시판 -->
+  <div id="score-board">
+    <div>소손녕 설득도: <span id="score-text">0</span> / 100점</div>
+    <div id="score-bar-bg"><div id="score-bar"></div></div>
+  </div>
+
+  <!-- UI 대화 레이어 -->
+  <div id="ui-layer">
+    <div id="speaker-name">소손녕</div>
+    <div id="dialogue-text">나는 대거란국의 80만 대군을 이끄는 장수 소손녕이다! 고려는 즉시 우리에게 땅을 바치고 항복하라!</div>
+    
+    <div id="control-box">
+      <input type="text" id="text-input" placeholder="서희가 되어 입력하거나 마이크 버튼을 눌러보세요..." onkeypress="handleKeyPress(event)">
+      <button id="send-btn" onclick="sendTextInput()">전송</button>
+      <button id="mic-btn" onclick="toggleSpeech()">🎤 음성</button>
+    </div>
+  </div>
+
+  <!-- 엔딩 레이어 -->
+  <div id="ending-screen">
+    <h1 id="ending-title"></h1>
+    <p id="ending-desc" style="font-size: 20px; margin-bottom: 30px;"></p>
+    <button class="btn" onclick="location.reload()">다시 도전하기</button>
+  </div>
+</div>
+
+<script>
+  let apiKey = "";
+  let totalScore = 0;
+  let recognition;
+  let isRecording = false;
+
+  // 음성 인식 설정 (Web Speech API)
+  if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.interimResults = false;
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      document.getElementById('text-input').value = transcript;
+      sendToAI(transcript);
+    };
+
+    recognition.onend = () => {
+      isRecording = false;
+      document.getElementById('mic-btn').classList.remove('recording');
+      document.getElementById('mic-btn').innerText = "🎤 음성";
+    };
+  }
+
+  function toggleSpeech() {
+    if(!apiKey) { alert("API Key를 먼저 입력해주세요."); return; }
+    if (!recognition) { alert("이 브라우저는 음성 인식을 지원하지 않습니다. 키보드로 입력해주세요."); return; }
+    
+    if (isRecording) {
+      recognition.stop();
+    } else {
+      recognition.start();
+      isRecording = true;
+      document.getElementById('mic-btn').classList.add('recording');
+      document.getElementById('mic-btn').innerText = "🛑 듣는 중...";
+    }
+  }
+
+  // 키보드 엔터키 처리
+  function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+      sendTextInput();
+    }
+  }
+
+  // 텍스트 입력 전송
+  function sendTextInput() {
+    const inputField = document.getElementById('text-input');
+    const text = inputField.value.trim();
+    if (!text) return;
+    
+    sendToAI(text);
+    inputField.value = ""; // 입력창 초기화
+  }
+
+  function startGame() {
+    const input = document.getElementById('api-input').value.trim();
+    if(!input) { alert("API Key를 입력해야 합니다."); return; }
+    apiKey = input;
+    document.getElementById('api-modal').style.display = 'none';
+  }
+
+  // Gemini API 호출 및 피드백 로직
+  async function sendToAI(userText) {
+    if (!apiKey) { alert("API Key를 먼저 입력해 주세요."); return; }
+
+    document.getElementById('dialogue-text').innerText = "소손녕이 당신의 말을 검토하는 중입니다...";
+
+    const prompt = `
+    당신은 993년 고려를 침공한 거란의 장수 '소손녕'입니다. 초등학생 대상 외교 게임입니다.
+    플레이어는 고려의 외교관 '서희'입니다.
+    
+    [거란의 속마음 및 사료 기준]
+    1. 고려가 고구려를 계승했다고 주장하면 어느 정도 인정함.
+    2. 송나라와의 관계를 끊고 거란과 친하게 지내겠다고 하면 긍정 평가.
+    3. 여진족 때문에 길 막혀서 교류 못했다고 하면 강동 6주를 줄 명분이 생김.
+
+    [플레이어 발언]: "${userText}"
+
+    [응답 규칙 (JSON 형식으로만 답할 것)]:
+    {
+      "score": (이번 발언의 점수 0~40점 사이 정수),
+      "response": "(소손녕의 어조로 거친 장수처럼 대답하는 2문장 내외 초등학생 눈높이 답변)",
+      "feedback": "(초등학생이 알기 쉽게 서희처럼 설득하려면 어떤 역사적 사실을 말해야 하는지 조언 1문장)"
+    }
+    `;
+
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+
+      const data = await res.json();
+      const result = JSON.parse(data.candidates[0].content.parts[0].text);
+
+      totalScore = Math.min(100, totalScore + result.score);
+      updateScore(totalScore);
+
+      document.getElementById('dialogue-text').innerHTML = 
+        `"${result.response}"<br><br><small style="color:#f39c12">💡 [피드백]: ${result.feedback}</small>`;
+
+      if (totalScore >= 100) {
+        triggerEnding(true);
+      }
+
+    } catch (e) {
+      document.getElementById('dialogue-text').innerText = "오류가 발생했습니다. API 키나 네트워크 상태를 확인해 주세요.";
+    }
+  }
+
+  function updateScore(score) {
+    document.getElementById('score-text').innerText = score;
+    document.getElementById('score-bar').style.width = score + '%';
+  }
+
+  function triggerEnding(isSuccess) {
+    const endingScreen = document.getElementById('ending-screen');
+    const endingVideo = document.getElementById('ending-video');
+    const mainVideo = document.getElementById('sosonnyung-video');
+    const title = document.getElementById('ending-title');
+    const desc = document.getElementById('ending-desc');
+
+    mainVideo.style.display = 'none';
+    endingVideo.style.display = 'block';
+    endingScreen.style.display = 'flex';
+
+    if (isSuccess) {
+      title.innerText = "📜 외교 승리! 강동 6주 획득";
+      title.style.color = "#2ecc71";
+      desc.innerText = "소손녕을 잘 설득하여 거란군이 순순히 물러갔습니다!";
+      endingVideo.src = "withdraw.webm";
+    }
+
+    endingVideo.play();
+    
+    // 10초짜리 영상을 5초만 재생 후 멈춤
+    setTimeout(() => {
+      endingVideo.pause();
+    }, 5000);
+  }
+</script>
+</body>
+</html>
