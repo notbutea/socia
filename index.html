@@ -58,6 +58,7 @@
     #api-input {
       width: 500px; padding: 12px; font-size: 16px; border-radius: 5px;
       border: 1px solid #555; margin-bottom: 20px; text-align: center;
+      user-select: auto;
     }
     .btn {
       padding: 12px 30px; font-size: 18px; font-weight: bold; background: #e67e22;
@@ -67,14 +68,14 @@
 
     /* 대화창 UI */
     #ui-layer {
-      position: absolute; bottom: 0; left: 0; width: 100%; height: 260px;
-      background: linear-gradient(transparent, rgba(0,0,0,0.95) 40%);
+      position: absolute; bottom: 0; left: 0; width: 100%; height: 280px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.95) 30%);
       display: flex; flex-direction: column; justify-content: flex-end;
       padding: 20px 40px; z-index: 10;
     }
 
     #speaker-name { font-size: 22px; font-weight: bold; color: #f1c40f; margin-bottom: 8px; }
-    #dialogue-text { font-size: 18px; line-height: 1.5; height: 60px; color: #ecf0f1; }
+    #dialogue-text { font-size: 18px; line-height: 1.5; height: 75px; color: #ecf0f1; overflow-y: auto; }
 
     /* 점수 게이지 바 */
     #score-board {
@@ -85,18 +86,32 @@
     #score-bar-bg { width: 100%; height: 20px; background: #333; border-radius: 10px; overflow: hidden; margin-top: 5px;}
     #score-bar { width: 0%; height: 100%; background: #2ecc71; transition: width 0.5s; }
 
-    /* 컨트롤 버튼 영역 */
+    /* 컨트롤 영역 (키보드 + 마이크) */
     #control-box {
-      margin-top: 15px; display: flex; gap: 15px; align-items: center;
+      margin-top: 10px; display: flex; gap: 10px; align-items: center;
     }
+
+    #text-input {
+      flex: 1; padding: 12px 15px; font-size: 16px; border-radius: 8px;
+      border: 1px solid #555; background: rgba(0, 0, 0, 0.7); color: #fff;
+      outline: none; user-select: auto;
+    }
+
+    #text-input:focus { border-color: #f39c12; }
+
+    #send-btn {
+      background: #2980b9; color: white; border: none; padding: 12px 20px;
+      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer;
+    }
+    #send-btn:hover { background: #3498db; }
+
     #mic-btn {
-      background: #c0392b; color: white; border: none; padding: 10px 20px;
-      font-size: 16px; border-radius: 20px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      background: #c0392b; color: white; border: none; padding: 12px 18px;
+      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
     }
     #mic-btn.recording { background: #27ae60; animation: pulse 1s infinite; }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-
-    #user-input-preview { font-style: italic; color: #bdc3c7; flex: 1; }
 
     /* 엔딩 스크린 */
     #ending-screen {
@@ -139,8 +154,9 @@
     <div id="dialogue-text">나는 대거란국의 80만 대군을 이끄는 장수 소손녕이다! 고려는 즉시 우리에게 땅을 바치고 항복하라!</div>
     
     <div id="control-box">
-      <button id="mic-btn" onclick="toggleSpeech()">🎤 말하기 (클릭)</button>
-      <div id="user-input-preview">마이크 버튼을 누르고 서희가 되어 설득해보세요...</div>
+      <input type="text" id="text-input" placeholder="서희가 되어 입력하거나 마이크 버튼을 눌러보세요..." onkeypress="handleKeyPress(event)">
+      <button id="send-btn" onclick="sendTextInput()">전송</button>
+      <button id="mic-btn" onclick="toggleSpeech()">🎤 음성</button>
     </div>
   </div>
 
@@ -163,30 +179,25 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
     recognition.lang = 'ko-KR';
-    recognition.interimResults = true;
+    recognition.interimResults = false;
 
     recognition.onresult = (event) => {
-      let transcript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-      }
-      document.getElementById('user-input-preview').innerText = "내 말: " + transcript;
-      if (event.results[0].isFinal) {
-        sendToAI(transcript);
-      }
+      const transcript = event.results[0][0].transcript;
+      document.getElementById('text-input').value = transcript;
+      sendToAI(transcript);
     };
 
     recognition.onend = () => {
       isRecording = false;
       document.getElementById('mic-btn').classList.remove('recording');
-      document.getElementById('mic-btn').innerText = "🎤 말하기 (클릭)";
+      document.getElementById('mic-btn').innerText = "🎤 음성";
     };
-  } else {
-    alert("이 브라우저는 음성 인식을 지원하지 않습니다. Chrome 브라우저를 이용하세요.");
   }
 
   function toggleSpeech() {
     if(!apiKey) { alert("API Key를 먼저 입력해주세요."); return; }
+    if (!recognition) { alert("이 브라우저는 음성 인식을 지원하지 않습니다. 키보드로 입력해주세요."); return; }
+    
     if (isRecording) {
       recognition.stop();
     } else {
@@ -195,6 +206,23 @@
       document.getElementById('mic-btn').classList.add('recording');
       document.getElementById('mic-btn').innerText = "🛑 듣는 중...";
     }
+  }
+
+  // 키보드 엔터키 처리
+  function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+      sendTextInput();
+    }
+  }
+
+  // 텍스트 입력 전송
+  function sendTextInput() {
+    const inputField = document.getElementById('text-input');
+    const text = inputField.value.trim();
+    if (!text) return;
+    
+    sendToAI(text);
+    inputField.value = ""; // 입력창 초기화
   }
 
   function startGame() {
@@ -206,6 +234,8 @@
 
   // Gemini API 호출 및 피드백 로직
   async function sendToAI(userText) {
+    if (!apiKey) { alert("API Key를 먼저 입력해 주세요."); return; }
+
     document.getElementById('dialogue-text').innerText = "소손녕이 당신의 말을 검토하는 중입니다...";
 
     const prompt = `
@@ -248,8 +278,6 @@
 
       if (totalScore >= 100) {
         triggerEnding(true);
-      } else if (totalScore < 0) {
-        triggerEnding(false);
       }
 
     } catch (e) {
@@ -277,12 +305,7 @@
       title.innerText = "📜 외교 승리! 강동 6주 획득";
       title.style.color = "#2ecc71";
       desc.innerText = "소손녕을 잘 설득하여 거란군이 순순히 물러갔습니다!";
-      endingVideo.src = "withdraw.webm"; // 승리 영상
-    } else {
-      title.innerText = "⚔️ 설득 실패... 거란의 점령";
-      title.style.color = "#e74c3c";
-      desc.innerText = "소손녕의 마음을 돌리지 못하여 고려가 위기에 처했습니다.";
-      endingVideo.src = "occupied.webm"; // 패배 영상
+      endingVideo.src = "withdraw.webm";
     }
 
     endingVideo.play();
